@@ -1,4 +1,4 @@
-setup,f1,precision,recall,note
+setup,f1,precision,recall,
 "Stage 2 — mBERT + DAPT (EN), zero-shot RuDReC",0.29,,,
 L0_BioBERT_zero_shot,0.08513632365875111,0.04649375600384246,0.5041666666666667,
 L1_mBERT_supervised,0.9271383315733898,0.9420600858369099,0.9126819126819127,
