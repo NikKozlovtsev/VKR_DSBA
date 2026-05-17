@@ -1,0 +1,42 @@
+# Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.so
+.Python
+.venv/
+venv/
+
+# Training artefacts
+checkpoints/
+runs/
+wandb/
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+
+# Data
+data/raw/
+data/cache/
+*.zip
+*.tar.gz
+
+# LaTeX build
+thesis/*.aux
+thesis/*.log
+thesis/*.toc
+thesis/*.out
+thesis/*.bbl
+thesis/*.blg
+thesis/*.synctex.gz
+thesis/*.fdb_latexmk
+thesis/*.fls
+
+# OS
+.DS_Store
+Thumbs.db
