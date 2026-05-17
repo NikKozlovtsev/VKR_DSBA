@@ -1,150 +1,181 @@
-# VKR_DSBA — Pretraining mBERT for chemical NER
+# VKR_DSBA — mBERT + DAPT for chemical NER, with cross-lingual extension to Russian
 
-Bachelor thesis · HSE University, DSBA · April 2026
-**Author:** N. Kozlovcev
+Bachelor thesis · HSE University, DSBA · 2026
+**Author:** Nikita Kozlovtsev
 
-Supplementary code and experimental notebooks for the thesis
-**“Pretraining mBERT for text-analysis tasks in chemistry, biochemistry, and related disciplines.”**
+Supplementary code and notebooks for the bachelor thesis
+**"Pretraining mBERT for text-analysis tasks in chemistry, biochemistry, and
+related disciplines."**
 
 ---
 
 ## What this work is about
 
-The thesis studies **efficient adaptation** of transformer encoders to chemical
-Named Entity Recognition (NER), and how far that adaptation transfers to
-Russian, for which there is no biomedical pretraining data.
+The thesis studies **domain adaptation** of pre-trained Transformer encoders
+for chemical Named Entity Recognition (NER), and whether the same recipe
+transfers to a Cyrillic-script target language (Russian) for which no
+biomedical pretraining data is available.
 
-The research is organised in two stages:
+The research is organised in **three stages**:
 
-1. **Stage 1 — cheap-strategy screening.** On three backbones (BioBERT, mBERT,
-   DeBERTa-v3) we compare four adaptation recipes: frozen encoder, partial
-   unfreezing of the top 6 layers (S1), tokenizer-only adaptation (S2), and
-   full fine-tuning (S3). The goal is to pick a model family and recipe that
-   are worth scaling up.
-2. **Stage 2 — scaled DAPT pipeline.** On the chosen BERT-family backbones we
-   add Domain-Adaptive Pretraining (DAPT) via MLM on BC5CDR + BC4CHEMD, then
-   fine-tune for chemical NER on BC5CDR, and evaluate cross-lingual transfer
-   on RuDReC and on a translated BC5CDR-RU.
+1. **Stage 1 — strategy screening.** On three backbones (BioBERT, mBERT,
+   DeBERTa-v3) we compare four adaptation recipes (frozen / top-6 unfreezing
+   / tokenizer-only / full fine-tuning) on BC5CDR. The goal is to pick a
+   model family and recipe that are worth scaling up.
+2. **Stage 2 — DAPT pipeline.** On the chosen BERT-family backbones we add
+   Domain-Adaptive Pre-Training (DAPT) via MLM on BC5CDR ∪ BC4CHEMD, then
+   fine-tune for chemical NER on BC5CDR. We also measure intrinsic gain
+   (MLM perplexity) and cross-lingual zero-shot transfer to RuDReC.
+3. **Stage 3 — supervised RuDReC + ablation.** We fine-tune mBERT directly
+   on RuDReC train and run a four-lever ablation (L0–L3) to isolate the
+   contribution of (a) target-language supervision, (b) cross-lingual
+   English DAPT, and (c) raw Russian MLM data.
 
 Everything runs end-to-end on a free-tier Google Colab T4 GPU.
 
 ---
 
-## Repository contents
+## Repository layout
 
-| File | Stage | Purpose |
-|---|---|---|
-| **`s1-s4_strategies.ipynb`** | Stage 1 | Adaptation-strategy screening: Baseline / S1 (top-6 unfreeze) / S2 (tokenizer-only) / S3 (full FT) on BioBERT, mBERT and DeBERTa-v3. Output of this notebook drives the model and recipe choice for Stage 2. |
-| **`training_for_stage_1.ipynb`** | Stage 1 | Training utilities and supporting runs for the screening stage (loss curves, single-strategy fits, inspection of intermediate checkpoints). |
-| **`Final_NER_BioBERT_DAPT.ipynb`** | Stage 2 | The main experimental notebook of the thesis: DAPT on BC5CDR + BC4CHEMD, NER fine-tuning on BC5CDR for the four model variants (mBERT ± DAPT, BioBERT ± DAPT), and cross-lingual evaluation on RuDReC and BC5CDR-RU. |
-| **`res_for_3_models.pdf`** | Stage 1 | Tabulated screening results: F1 / P / R for Baseline, S1, S2, S3 on each of the three backbones. Source of the Stage-1 numbers in the thesis text and pre-defence slides. |
-| **`README.md`** | — | This file. |
+```
+stage1/                    strategy-screening notebooks (4 recipes × 3 backbones)
+  s1-s4_strategies.ipynb
+  training_for_stage_1.ipynb
+  res_for_3_models.pdf
 
-> The Stage-2 notebook is the canonical entry point — open it first if you only
-> want to reproduce the headline numbers.
+stage2/                    DAPT + fine-tuning pipeline on BC5CDR ∪ BC4CHEMD
+  Final_NER_BioBERT_DAPT.ipynb
 
----
+stage3/                    cross-lingual supervised RuDReC + L0–L3 ablation
+  Stage3_RuDReC_supervised_clean.ipynb
+  stage3_results.png       (Figure 5 of the thesis)
 
-## Models compared (Stage 2)
+data/                      dataset pointers (no data committed)
+  README.md
 
-A 2 × 2 design under one identical fine-tuning recipe:
+results/                   CSV outputs behind every table in the thesis
+  stage3_levers.csv
 
-| Model | Pretrain | Vocabulary | Role |
-|---|---|---|---|
-| mBERT | Wikipedia, 104 languages | multilingual WordPiece | main subject of adaptation |
-| mBERT + DAPT | + MLM on BC5CDR + BC4CHEMD | multilingual WordPiece | proposed model |
-| BioBERT v1.1 | PubMed + PMC | English WordPiece | English upper bound |
-| BioBERT + DAPT | + MLM on BC5CDR + BC4CHEMD | English WordPiece | upper bound with domain |
+thesis/                    LaTeX source and final PDF (added on submission)
+  main.tex
+  main.pdf
 
-All four are BERT-base, 12 layers, ~110 M parameters.
+requirements.txt           pinned package versions
+LICENSE                    MIT
+README.md                  this file
+```
 
----
-
-## Datasets
-
-| Dataset | Source | Used as |
-|---|---|---|
-| BC5CDR | `tner/bc5cdr` (parquet branch) | DAPT corpus (raw text) + EN NER train / test |
-| BC4CHEMD | `disi-unibo-nlp/bc4chemd` (parquet branch) | DAPT corpus (raw text) only |
-| RuDReC | `cimm-kzn/RuDReC` (raw JSONL from GitHub) | main RU NER test, few-shot |
-| BC5CDR-RU | translated with `Helsinki-NLP/opus-mt-en-ru`, 500 sentences | RU sanity-check |
-
-All NER tasks are reduced to a 3-tag BIO scheme: `O`, `B-Chemical`, `I-Chemical`.
-
----
-
-## Frozen experimental protocol
-
-Identical across **all** four Stage-2 models — any difference in F1 is
-attributable to backbone and DAPT, not to hyperparameter search.
-
-- `seed = 42`, `max_len = 256`, `batch = 16`, `fp16` (T4)
-- NER fine-tune: 3 epochs, LR 3e-5, warmup 0.1
-- DAPT (MLM): 3 epochs, LR 5e-5, `mlm_probability = 0.15`
-- Metric: token / entity-level Precision, Recall and F1 via `seqeval`
-- Single seed at this stage; multi-seed re-runs are listed under *Limitations*
-  in the thesis.
+The Stage 3 notebook `stage3/Stage3_RuDReC_supervised_clean.ipynb` is the
+canonical entry point for the final headline numbers.
 
 ---
 
 ## Headline results
 
-| Setup | BC5CDR F1 (EN) | RuDReC F1 (RU, zero-shot) |
-|---|---|---|
-| mBERT | 0.8949 | — |
-| mBERT + DAPT | **0.9030** (+0.81 vs no-DAPT) | **0.290** |
-| BioBERT + DAPT | **0.9245** (English upper bound) | 0.000 |
+### Stage 2 — English (BC5CDR)
 
-Intrinsic check: mBERT MLM perplexity drops **11.77 → 5.31 (−54.9 %)** after
-DAPT — intrinsic and extrinsic signals agree.
+| Setup           | BC5CDR F1   |
+|-----------------|-------------|
+| mBERT           | 0.8949      |
+| mBERT + DAPT    | **0.9030**  |
+| BioBERT + DAPT  | 0.9245      |
 
-The strongest qualitative finding is that **mBERT + DAPT transfers zero-shot
-to Russian RuDReC at F1 ≈ 0.29 with no Russian biomedical pretraining data**,
-while BioBERT collapses to 0 because its English WordPiece vocabulary cannot
-represent Cyrillic input. Vocabulary coverage of the target language outweighs
-domain specialisation when no target-language pretraining data is available.
+Intrinsic check — mBERT MLM perplexity on the chemical corpus drops from
+**1.10 × 10⁵ → 3.78** after DAPT.
 
-Full numerical tables, including Stage-1 screening, are in `res_for_3_models.pdf`
-and in the thesis text.
+### Stage 3 — Russian (RuDReC, 4-lever ablation)
+
+| Lever | Backbone | DAPT             | Supervised on RuDReC | RuDReC test F1 |
+|-------|----------|------------------|----------------------|----------------|
+| L0    | BioBERT  | —                | — (zero-shot)        | 0.085          |
+| L1    | mBERT    | —                | ✓                    | **0.927**      |
+| L2    | mBERT    | EN (BC4CHEMD)    | ✓                    | 0.922          |
+| L3    | mBERT    | EN + RU raw      | ✓                    | 0.920          |
+
+Figure 5 of the thesis is `stage3/stage3_results.png`.
+
+---
+
+## Main finding
+
+- On the **source language without supervision**, DAPT is the main lever
+  (mBERT +0.0081 F1 on BC5CDR; zero-shot to RuDReC moves from 0 to 0.290).
+- On the **target language with supervision**, DAPT **saturates**: L1 vs L2
+  vs L3 differ by less than 0.01 F1, and supervised mBERT pulls the metric
+  from 0.085 (BioBERT zero-shot) up to 0.927.
+
+The thesis interprets this as a *labels-vs-pretraining* trade-off: domain
+vocabulary and continued MLM dominate when no target-language labels
+exist; once labels are present, the contribution of further DAPT washes
+out.
+
+---
+
+## Frozen experimental protocol
+
+Identical across all stages — any difference in F1 is attributable to the
+listed lever, not to hyperparameter search.
+
+- `seed = 42`, `max_len = 256`, `batch = 16`, `fp16` (T4)
+- NER fine-tune: 5 epochs, LR 3 × 10⁻⁵, warm-up 0.10
+- DAPT (MLM): 3 epochs, LR 5 × 10⁻⁵, `mlm_probability = 0.15`
+- Metric: entity-level Precision / Recall / F1 via strict `seqeval`
+- 3-tag BIO scheme: `O`, `B-Chemical`, `I-Chemical`
+- RuDReC drug labels collapsed: `Drugname` / `Drugclass` / `Drugform` →
+  `Chemical`
 
 ---
 
 ## How to reproduce
 
 1. Open the chosen notebook in **Google Colab** with a T4 runtime.
-2. Run cells top-to-bottom — no manual configuration files, all hyperparameters
-   are literals in the code.
-3. Datasets are pulled at runtime from the Hugging Face Hub (parquet branches
-   for BC5CDR and BC4CHEMD) or directly from GitHub (RuDReC raw JSONL); no
-   local download is required.
-4. Single full run on T4 covers DAPT + NER fine-tune + evaluation in a few
-   hours per model variant.
+2. Run cells top-to-bottom — no config files, all hyperparameters are
+   literals.
+3. Datasets are pulled at runtime; nothing is committed to this repo.
+4. A full Stage 3 run (DAPT + fine-tune + eval) finishes in a few hours
+   per lever on a free-tier T4.
 
-Recommended order:
-`s1-s4_strategies.ipynb` → `training_for_stage_1.ipynb` → `Final_NER_BioBERT_DAPT.ipynb`.
+Recommended order to reproduce thesis numbers:
+
+```
+stage1/s1-s4_strategies.ipynb
+stage2/Final_NER_BioBERT_DAPT.ipynb
+stage3/Stage3_RuDReC_supervised_clean.ipynb
+```
+
+Pinned package versions are in `requirements.txt`.
+
+---
+
+## Datasets
+
+| Dataset  | Source                                | Used as                                  |
+|----------|---------------------------------------|------------------------------------------|
+| BC5CDR   | `tner/bc5cdr` (HF Hub, parquet)       | DAPT corpus + English NER train / test   |
+| BC4CHEMD | `disi-unibo-nlp/bc4chemd` (HF Hub)    | DAPT corpus only                         |
+| RuDReC   | `cimm-kzn/RuDReC` raw JSONL on GitHub | Russian NER train / test (Stage 3)       |
+
+Direct RuDReC URL:
+`https://raw.githubusercontent.com/cimm-kzn/RuDReC/master/data/rudrec_annotated.json`
 
 ---
 
 ## Status and limitations
 
-- **Pre-defence stage.** Numbers reported here are preliminary single-seed
-  runs. Multi-seed averaging (mean ± std over 3 seeds) and a few-shot RuDReC
-  baseline with the full RU train split are scheduled before the final defence.
-- **Compute-capped.** All training fits inside Colab free-tier T4 limits;
-  larger backbones (XLM-R-large, DeBERTa-v3-large) are not in scope.
-- **BC5CDR-RU is a sanity-check, not a benchmark** — it is machine-translated
-  and partly measures preserved Latin chemical names.
-- **DAPT and NER share BC5CDR.** This follows standard DAPT practice
-  (Gururangan et al., 2020) but is documented as a transductive setup in the
-  thesis; a BC4CHEMD-only DAPT control is on the next-steps list.
+- Single-seed runs at this stage; multi-seed averaging is listed as future
+  work in Section 7 of the thesis.
+- All training fits inside Colab free-tier T4 limits; larger backbones
+  (XLM-R-large, DeBERTa-v3-large) are out of scope.
+- The Stage 3 ablation uses a single RuDReC train / test split
+  (70 / 15 / 15); k-fold cross-validation is on the next-steps list.
 
 ---
 
 ## Citation
 
-If you use the code or numbers from this repository, please cite the bachelor
-thesis:
-
-> Kozlovcev N. *Pretraining mBERT for text-analysis tasks in chemistry,
+> Kozlovtsev N. *Pretraining mBERT for text-analysis tasks in chemistry,
 > biochemistry, and related disciplines.* Bachelor thesis, HSE University,
 > DSBA, 2026.
+
+The thesis PDF is in `thesis/main.pdf` once the final version is
+submitted.
